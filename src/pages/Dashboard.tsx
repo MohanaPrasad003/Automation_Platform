@@ -1,7 +1,7 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { 
   ArrowRight, 
   Plus, 
@@ -13,13 +13,63 @@ import {
   Calendar,
   Clock,
   MoreHorizontal,
-  LogOut
+  LogOut,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import WorkflowCreator from "@/components/WorkflowCreator";
+import ApiKeyManager from "@/components/ApiKeyManager";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/components/ui/use-toast";
 
 const Dashboard = () => {
   const [activeSection, setActiveSection] = useState("workflows");
+  const [workflows, setWorkflows] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const { toast } = useToast();
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    checkAuth();
+  }, []);
+  
+  const checkAuth = async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+      navigate("/auth");
+      return;
+    }
+    
+    setUser(session.user);
+    fetchWorkflows();
+  };
+  
+  const fetchWorkflows = async () => {
+    try {
+      setLoading(true);
+      
+      const { data, error } = await supabase
+        .from('workflows')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(3);
+        
+      if (error) throw error;
+      
+      setWorkflows(data || []);
+    } catch (error: any) {
+      console.error("Error fetching workflows:", error);
+      // Don't show error toast on first load
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
   
   return (
     <>
@@ -59,8 +109,8 @@ const Dashboard = () => {
                 </div>
                 
                 <div className="hidden md:block">
-                  <p className="font-medium text-sm">John Doe</p>
-                  <p className="text-xs text-gray-500">john@example.com</p>
+                  <p className="font-medium text-sm">{user?.email ? user.email.split('@')[0] : 'User'}</p>
+                  <p className="text-xs text-gray-500">{user?.email || ''}</p>
                 </div>
                 
                 <ChevronDown className="h-4 w-4 text-gray-400" />
@@ -97,35 +147,12 @@ const Dashboard = () => {
                 </ul>
               </nav>
               
-              <div className="bg-white rounded-xl shadow-sm p-5 border border-automation-border">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-medium">API Keys</h3>
-                  <button className="text-sm text-automation-primary">Manage</button>
-                </div>
-                
-                <ul className="space-y-3">
-                  {["Google", "Slack", "GitHub"].map((service) => (
-                    <li key={service} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 rounded-full bg-automation-secondary flex items-center justify-center">
-                          <div className="w-4 h-4 rounded-sm bg-gray-400"></div>
-                        </div>
-                        <span className="text-sm">{service}</span>
-                      </div>
-                      <span className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
-                        Connected
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                
-                <button className="mt-4 text-sm flex items-center text-automation-primary">
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Service
-                </button>
-              </div>
+              {user && <ApiKeyManager userId={user.id} />}
               
-              <button className="w-full flex items-center justify-between p-4 text-sm text-gray-600 hover:text-automation-primary transition-colors">
+              <button 
+                className="w-full flex items-center justify-between p-4 text-sm text-gray-600 hover:text-automation-primary transition-colors"
+                onClick={handleLogout}
+              >
                 <div className="flex items-center">
                   <LogOut className="h-4 w-4 mr-2" />
                   Log out
@@ -142,7 +169,7 @@ const Dashboard = () => {
                 </div>
                 
                 <Link
-                  to="/dashboard/create"
+                  to="/workflow-creator"
                   className="inline-flex items-center space-x-2 bg-automation-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-opacity-90 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
@@ -157,69 +184,80 @@ const Dashboard = () => {
                 
                 <div className="bg-white rounded-2xl shadow-md overflow-hidden animate-fade-in" style={{ animationDelay: "0.2s" }}>
                   <div className="p-6 md:p-8">
-                    <div className="mb-6">
-                      <h3 className="text-xl font-semibold mb-2">Recent Workflows</h3>
-                      <p className="text-gray-600">
-                        Your recently created and executed workflows
-                      </p>
+                    <div className="mb-6 flex items-center justify-between">
+                      <div>
+                        <h3 className="text-xl font-semibold mb-2">Recent Workflows</h3>
+                        <p className="text-gray-600">
+                          Your recently created and executed workflows
+                        </p>
+                      </div>
+                      <Link 
+                        to="/workflow-manager"
+                        className="text-automation-primary text-sm font-medium hover:underline"
+                      >
+                        View all
+                      </Link>
                     </div>
                     
                     <div className="space-y-4">
-                      {[
-                        {
-                          name: "Email New Customers",
-                          description: "Sends welcome email to new customers",
-                          status: "active",
-                          executions: 12
-                        },
-                        {
-                          name: "Daily Sales Report",
-                          description: "Compiles and sends daily sales reports",
-                          status: "active",
-                          executions: 45
-                        },
-                        {
-                          name: "Ticket Assignment",
-                          description: "Assigns tickets to team members",
-                          status: "paused",
-                          executions: 8
-                        }
-                      ].map((workflow, index) => (
-                        <div 
-                          key={index}
-                          className="p-4 border border-automation-border rounded-xl hover:border-automation-primary transition-colors cursor-pointer"
-                        >
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-medium">{workflow.name}</h4>
-                              <p className="text-sm text-gray-600">{workflow.description}</p>
-                            </div>
-                            <button className="text-gray-400 hover:text-automation-primary">
-                              <MoreHorizontal className="h-5 w-5" />
-                            </button>
-                          </div>
-                          
-                          <div className="mt-3 flex items-center justify-between text-sm">
-                            <span className={cn(
-                              "px-2 py-1 rounded-full",
-                              workflow.status === "active" 
-                                ? "bg-green-100 text-green-700" 
-                                : "bg-yellow-100 text-yellow-700"
-                            )}>
-                              {workflow.status === "active" ? "Active" : "Paused"}
-                            </span>
-                            <span className="text-gray-500">
-                              {workflow.executions} executions
-                            </span>
-                          </div>
+                      {loading ? (
+                        <div className="text-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin mx-auto text-automation-primary" />
+                          <p className="mt-4 text-gray-600">Loading your workflows...</p>
                         </div>
-                      ))}
+                      ) : workflows.length === 0 ? (
+                        <div className="text-center py-8">
+                          <p className="text-gray-600 mb-4">You haven't created any workflows yet.</p>
+                          <Link
+                            to="/workflow-creator"
+                            className="inline-flex items-center space-x-2 bg-automation-primary text-white px-4 py-2 rounded-lg font-medium hover:bg-opacity-90 transition-colors"
+                          >
+                            <Plus className="h-4 w-4" />
+                            <span>Create your first workflow</span>
+                          </Link>
+                        </div>
+                      ) : (
+                        workflows.map((workflow, index) => (
+                          <div 
+                            key={workflow.id || index}
+                            className="p-4 border border-automation-border rounded-xl hover:border-automation-primary transition-colors cursor-pointer"
+                            onClick={() => navigate(`/workflow-edit/${workflow.id}`)}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <h4 className="font-medium">{workflow.name}</h4>
+                                <p className="text-sm text-gray-600">{workflow.description}</p>
+                              </div>
+                              <button className="text-gray-400 hover:text-automation-primary">
+                                <MoreHorizontal className="h-5 w-5" />
+                              </button>
+                            </div>
+                            
+                            <div className="mt-3 flex items-center justify-between text-sm">
+                              <span className={cn(
+                                "px-2 py-1 rounded-full",
+                                workflow.status === "active" 
+                                  ? "bg-green-100 text-green-700" 
+                                  : "bg-yellow-100 text-yellow-700"
+                              )}>
+                                {workflow.status === "active" ? "Active" : "Paused"}
+                              </span>
+                              <span className="text-gray-500">
+                                {workflow.execution_count || 0} executions
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                     
                     <div className="mt-6 text-center">
-                      <button className="text-automation-primary text-sm font-medium hover:underline">
+                      <Link 
+                        to="/workflow-manager"
+                        className="text-automation-primary text-sm font-medium hover:underline"
+                      >
                         View all workflows
-                      </button>
+                      </Link>
                     </div>
                   </div>
                 </div>
