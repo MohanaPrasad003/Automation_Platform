@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import { useNavigate } from "react-router-dom";
@@ -16,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/components/ui/use-toast";
 import WorkflowList from "@/components/WorkflowList";
-import { supabase } from "@/lib/supabase";
+import { supabase, mockSupabaseData } from "@/lib/supabase";
 
 const WorkflowManager = () => {
   const [workflows, setWorkflows] = useState<any[]>([]);
@@ -25,16 +24,23 @@ const WorkflowManager = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sortOrder, setSortOrder] = useState<"newest" | "oldest" | "alphabetical">("newest");
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
     // Check if user is authenticated
     const checkAuth = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/auth");
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          // For demo purposes, we'll continue without authentication
+          console.log("No active session, using mock data");
+          setIsUsingMockData(true);
+        }
+      } catch (error) {
+        console.error("Auth check failed, using mock data", error);
+        setIsUsingMockData(true);
       }
       
       fetchWorkflows();
@@ -75,15 +81,39 @@ const WorkflowManager = () => {
   const fetchWorkflows = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('workflows')
-        .select('*')
-        .order('created_at', { ascending: false });
-        
-      if (error) throw error;
       
-      setWorkflows(data || []);
-      setFilteredWorkflows(data || []);
+      if (isUsingMockData) {
+        // Use mock data for demo purposes
+        setWorkflows(mockSupabaseData.workflows);
+        setFilteredWorkflows(mockSupabaseData.workflows);
+        toast({
+          title: "Demo Mode",
+          description: "Using mock data for demonstration. Connect Supabase for full functionality.",
+        });
+      } else {
+        // Try to fetch from Supabase
+        try {
+          const { data, error } = await supabase
+            .from('workflows')
+            .select('*')
+            .order('created_at', { ascending: false });
+            
+          if (error) throw error;
+          
+          setWorkflows(data || []);
+          setFilteredWorkflows(data || []);
+        } catch (supabaseError) {
+          console.error("Supabase fetch failed, falling back to mock data", supabaseError);
+          setIsUsingMockData(true);
+          setWorkflows(mockSupabaseData.workflows);
+          setFilteredWorkflows(mockSupabaseData.workflows);
+          toast({
+            title: "Supabase Connection Failed",
+            description: "Using mock data for demonstration. Please check your Supabase configuration.",
+            variant: "destructive",
+          });
+        }
+      }
     } catch (error: any) {
       toast({
         title: "Error fetching workflows",
@@ -97,20 +127,40 @@ const WorkflowManager = () => {
 
   const saveWorkflow = async (workflowData: any) => {
     try {
-      const { data, error } = await supabase
-        .from('workflows')
-        .insert([workflowData])
-        .select();
+      if (isUsingMockData) {
+        // Mock save for demo mode
+        const newWorkflow = {
+          ...workflowData,
+          id: `mock-${Date.now()}`,
+          created_at: new Date().toISOString()
+        };
         
-      if (error) throw error;
-      
-      toast({
-        title: "Workflow saved",
-        description: "Your workflow has been saved successfully",
-      });
-      
-      fetchWorkflows();
-      return data[0];
+        const updatedWorkflows = [newWorkflow, ...mockSupabaseData.workflows];
+        setWorkflows(updatedWorkflows);
+        
+        toast({
+          title: "Workflow saved (Demo)",
+          description: "Your workflow has been saved in demo mode.",
+        });
+        
+        return newWorkflow;
+      } else {
+        // Try to save to Supabase
+        const { data, error } = await supabase
+          .from('workflows')
+          .insert([workflowData])
+          .select();
+          
+        if (error) throw error;
+        
+        toast({
+          title: "Workflow saved",
+          description: "Your workflow has been saved successfully",
+        });
+        
+        fetchWorkflows();
+        return data[0];
+      }
     } catch (error: any) {
       toast({
         title: "Error saving workflow",
@@ -122,31 +172,44 @@ const WorkflowManager = () => {
   };
 
   const handleStatusChange = (workflowId: string, newStatus: string) => {
-    const updateWorkflow = async () => {
-      try {
-        const { error } = await supabase
-          .from('workflows')
-          .update({ status: newStatus })
-          .eq('id', workflowId);
+    if (isUsingMockData) {
+      // Handle status change in mock mode
+      const updatedWorkflows = workflows.map(wf => 
+        wf.id === workflowId ? { ...wf, status: newStatus } : wf
+      );
+      setWorkflows(updatedWorkflows);
+      toast({
+        title: "Status updated (Demo)",
+        description: `Workflow status changed to ${newStatus} in demo mode.`,
+      });
+    } else {
+      // Try to update in Supabase
+      const updateWorkflow = async () => {
+        try {
+          const { error } = await supabase
+            .from('workflows')
+            .update({ status: newStatus })
+            .eq('id', workflowId);
+            
+          if (error) throw error;
           
-        if (error) throw error;
-        
-        toast({
-          title: "Status updated",
-          description: `Workflow status changed to ${newStatus}`,
-        });
-        
-        fetchWorkflows();
-      } catch (error: any) {
-        toast({
-          title: "Error updating status",
-          description: error.message,
-          variant: "destructive",
-        });
-      }
-    };
-    
-    updateWorkflow();
+          toast({
+            title: "Status updated",
+            description: `Workflow status changed to ${newStatus}`,
+          });
+          
+          fetchWorkflows();
+        } catch (error: any) {
+          toast({
+            title: "Error updating status",
+            description: error.message,
+            variant: "destructive",
+          });
+        }
+      };
+      
+      updateWorkflow();
+    }
   };
 
   return (

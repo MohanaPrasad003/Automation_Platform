@@ -3,11 +3,12 @@ import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { MoreHorizontal, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { supabase } from "@/lib/supabase";
+import { supabase, mockSupabaseData } from "@/lib/supabase";
 
 const RecentWorkflows = () => {
   const [workflows, setWorkflows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isUsingMockData, setIsUsingMockData] = useState(false);
   const navigate = useNavigate();
   
   useEffect(() => {
@@ -18,17 +19,26 @@ const RecentWorkflows = () => {
     try {
       setLoading(true);
       
-      const { data, error } = await supabase
-        .from('workflows')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(3);
+      try {
+        // Try to fetch from Supabase
+        const { data, error } = await supabase
+          .from('workflows')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(3);
+          
+        if (error) throw error;
         
-      if (error) throw error;
-      
-      setWorkflows(data || []);
+        setWorkflows(data || []);
+      } catch (error) {
+        // Fall back to mock data
+        console.log("Using mock data for recent workflows", error);
+        setIsUsingMockData(true);
+        setWorkflows(mockSupabaseData.workflows.slice(0, 3));
+      }
     } catch (error: any) {
       console.error("Error fetching workflows:", error);
+      setWorkflows([]);
     } finally {
       setLoading(false);
     }

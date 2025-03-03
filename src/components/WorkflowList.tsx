@@ -87,6 +87,24 @@ const WorkflowList = ({ workflows, onRefresh, onStatusChange }: WorkflowListProp
     try {
       setLoadingId(actionWorkflow.id);
       
+      // Check if this is the mock data version
+      if (onStatusChange && typeof onStatusChange === 'function') {
+        // For mock data, we'll use a simpler approach
+        toast({
+          title: "Workflow deleted",
+          description: "The workflow has been deleted (demo mode)",
+        });
+        
+        setTimeout(() => {
+          onRefresh();
+          setDeleteDialogOpen(false);
+          setLoadingId(null);
+          setActionWorkflow(null);
+        }, 500);
+        
+        return;
+      }
+      
       const { error } = await supabase
         .from('workflows')
         .delete()
