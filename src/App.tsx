@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import WorkflowManager from "./pages/WorkflowManager";
 import WorkflowCreatorPage from "./pages/WorkflowCreatorPage";
 import WorkflowEditPage from "./pages/WorkflowEditPage";
+import WorkflowTemplates from "./pages/WorkflowTemplates";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +30,7 @@ const App = () => (
             <Route path="/workflow-manager" element={<WorkflowManager />} />
             <Route path="/workflow-creator" element={<WorkflowCreatorPage />} />
             <Route path="/workflow-edit/:id" element={<WorkflowEditPage />} />
+            <Route path="/workflow-templates" element={<WorkflowTemplates />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
