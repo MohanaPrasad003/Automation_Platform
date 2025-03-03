@@ -5,7 +5,6 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Plus, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
-import WorkflowCreator from "@/components/WorkflowCreator";
 import WorkflowList from "@/components/WorkflowList";
 import { supabase } from "@/lib/supabase";
 
