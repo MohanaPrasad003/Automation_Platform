@@ -35,9 +35,10 @@ import { cn } from "@/lib/utils";
 interface WorkflowListProps {
   workflows: any[];
   onRefresh: () => void;
+  onStatusChange?: (workflowId: string, newStatus: string) => void;
 }
 
-const WorkflowList = ({ workflows, onRefresh }: WorkflowListProps) => {
+const WorkflowList = ({ workflows, onRefresh, onStatusChange }: WorkflowListProps) => {
   const [actionWorkflow, setActionWorkflow] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -48,6 +49,13 @@ const WorkflowList = ({ workflows, onRefresh }: WorkflowListProps) => {
     try {
       setLoadingId(workflow.id);
       const newStatus = workflow.status === "active" ? "paused" : "active";
+      
+      // If onStatusChange is provided, use it; otherwise, fall back to the internal implementation
+      if (onStatusChange) {
+        onStatusChange(workflow.id, newStatus);
+        setLoadingId(null);
+        return;
+      }
       
       const { error } = await supabase
         .from('workflows')
